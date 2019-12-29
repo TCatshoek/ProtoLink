@@ -65,7 +65,7 @@ int TCPSocket::read() {
 }
 
 int TCPSocket::write(char c) {
-    ssize_t n = ::write(clisockfd, &c, 1);
+    ssize_t n = ::send(clisockfd, &c, 1, MSG_NOSIGNAL);
 
     if (n < 0) {
         perror("Error writing to socket");

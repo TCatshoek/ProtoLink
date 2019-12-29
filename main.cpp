@@ -23,6 +23,9 @@ namespace {
     uint8_t buf[buflen];
 
     bool shouldStop = false;
+
+    TCPServer* server_p;
+    TCPSocket* socket_p;
 }
 
 #pragma clang diagnostic push
@@ -32,11 +35,13 @@ void handleNetwork(uint16_t port) {
     ProtoLink<TCPSocket> protolink(buf, buflen);
 
     // Setup neworking
-    TCPServer server(8081);
+    TCPServer server(8080);
+    server_p = &server;
 
     while (!shouldStop) {
         // Wait for connection
         TCPSocket socket = server.accept();
+        socket_p = &socket;
         std::cout << "Client connected from " << socket.getAddress() << ":" << socket.getPort() << std::endl;
 
         // Todo: figure out timeout stuff
@@ -95,7 +100,7 @@ void drawFb(Matrix* matrices[], uint n_matrices) {
             }
         }
 
-        acc += m->w + m->h;
+        acc += m->w * m->h;
     }
 }
 
@@ -117,12 +122,13 @@ int main (int argc, char *argv[]) {
     Matrix mouth_r_f(16, 8, window_w - 5.f - 32 * 15.f, window_h - 8 * 15.f - 5, false);
 
     Matrix* matrices[] = {&eye_l, &eye_r, &nose_l, &nose_r,
-                          &mouth_l_b, &mouth_l_f, &mouth_r_b, &mouth_r_f};
+                          &mouth_l_b, &mouth_l_f, &mouth_r_f, &mouth_r_b};
 
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(window_w, window_h), "My window", sf::Style::Titlebar | sf::Style::Close);
 
+    window.setFramerateLimit(60);
     // run the program as long as the window is open
     while (window.isOpen())
     {
@@ -132,11 +138,12 @@ int main (int argc, char *argv[]) {
         {
             // "close requested" event: we close the window
             if (event.type == sf::Event::Closed ||
-                event.type == sf::Event::KeyPressed){
-                shouldStop = true;
+                    (event.type == sf::Event::KeyPressed
+                    && event.key.code == sf::Keyboard::Escape)){
                 std::cout << "closing" << std::endl;
                 window.close();
-                net.join();
+                // Doesn't really work yet
+                shouldStop = true;
             }
         }
 
