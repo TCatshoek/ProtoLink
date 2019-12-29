@@ -7,9 +7,11 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <libnet.h>
 #include <sys/ioctl.h>
+#include <sys/fcntl.h>
 #include <string>
 
 // Dead simple tcp socket wrapper
@@ -37,6 +39,14 @@ public:
     int read();
 
     int write(char);
+
+    void setTimeout(int sec, int usec);
+
+    void setBlocking(bool enabled);
+
+    ~TCPSocket();
+
+    int close();
 };
 
 

@@ -27,6 +27,10 @@ public:
 
     TCPSocket accept();
 
+    int close();
+
+    ~TCPServer();
+
 };
 
 

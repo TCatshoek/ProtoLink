@@ -47,11 +47,7 @@ ssize_t TCPSocket::readBytes(void* buf, uint len) {
 
     if (n < 0) {
         perror("ERROR reading from socket");
-        exit(-1);
-    }
-
-    if (n == 0) {
-        _connected = false;
+        TCPSocket::close();
     }
 
     return n;
@@ -73,7 +69,40 @@ int TCPSocket::write(char c) {
 
     if (n < 0) {
         perror("Error writing to socket");
+        return TCPSocket::close();
     } else {
         return (int)n;
     }
 }
+
+int TCPSocket::close() {
+    _connected = false;
+    return ::close(clisockfd);
+}
+
+TCPSocket::~TCPSocket() {
+    TCPSocket::close();
+}
+
+void TCPSocket::setTimeout(int sec, int usec) {
+    struct timeval timeout = {};
+    timeout.tv_sec = sec;
+    timeout.tv_usec = usec;
+
+    if (setsockopt (clisockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
+                    sizeof(timeout)) < 0) {
+        perror("Setting timeout failed");
+    }
+}
+
+void TCPSocket::setBlocking(bool enabled) {
+    int x;
+    x=fcntl(clisockfd ,F_GETFL, 0);
+
+    if (enabled)
+        fcntl(clisockfd, F_SETFL, x & ~O_NONBLOCK);
+    else
+        fcntl(clisockfd, F_SETFL, x | O_NONBLOCK);
+}
+
+

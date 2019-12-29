@@ -31,3 +31,11 @@ TCPServer::TCPServer(uint16_t port) {
 TCPSocket TCPServer::accept() {
     return TCPSocket(sockfd);
 }
+
+int TCPServer::close() {
+    return ::close(sockfd);
+}
+
+TCPServer::~TCPServer() {
+    TCPServer::close();
+}

@@ -14,28 +14,36 @@
 #include "TCPServer.h"
 #include "protolink.h"
 
+#define buflen 1024
+
 namespace {
     uint window_w = 1000;
     uint window_h = 400;
 
-    uint buflen = 1024;
+    uint8_t buf[buflen];
+
+    bool shouldStop = false;
 }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 void handleNetwork(uint16_t port) {
     // Setup protolink
-    uint8_t buf[buflen];
     ProtoLink<TCPSocket> protolink(buf, buflen);
 
     // Setup neworking
-    TCPServer server(8080);
+    TCPServer server(8081);
 
-    while (true) {
+    while (!shouldStop) {
+        // Wait for connection
         TCPSocket socket = server.accept();
         std::cout << "Client connected from " << socket.getAddress() << ":" << socket.getPort() << std::endl;
 
-        while (socket.connected()) {
+        // Todo: figure out timeout stuff
+        //socket.setTimeout(10, 0);
+        //socket.setBlocking(false);
+
+        while (socket.connected() && !shouldStop) {
             // Keep track of protolink state
             ProtoLink<TCPSocket>::State state;
             state = protolink.init(&socket);
@@ -43,19 +51,53 @@ void handleNetwork(uint16_t port) {
             std::cout << "Protolink: " << protolink.stateToString() << std::endl;
 
             // Step protolink while we can
-            while (socket.connected() && state != ProtoLink<TCPSocket>::State::ERR) {
+            while (socket.connected()
+                    && state != ProtoLink<TCPSocket>::State::ERR
+                    && !shouldStop) {
+
                 state = protolink.run();
                 std::cout << "Protolink: " << protolink.stateToString() << std::endl;
-                socket.write(state);
-            }
 
+                if (socket.connected())
+                    socket.write((char)state);
+            }
         }
 
+        socket.close();
 
         std::cout << "Client disconnected" << std::endl;
     }
+
+    server.close();
 }
 #pragma clang diagnostic pop
+
+bool getbit(const uint8_t* buf, int pos) {
+    int byteidx = pos / (sizeof(uint8_t) * 8);
+    int bitidx = pos % (sizeof(uint8_t) * 8);
+
+    uint8_t tmp = buf[byteidx];
+
+    int bit = (tmp >> bitidx) & 1;
+
+    return (bool)bit;
+}
+
+void drawFb(Matrix* matrices[], uint n_matrices) {
+    int acc = 0;
+
+    for (uint i = 0; i < n_matrices; i++) {
+        Matrix* m = matrices[i];
+
+        for (int y = 0; y < m->h; y++) {
+            for(int x = 0; x < m->w; x++) {
+                m->drawPixel(x, y, getbit(buf, acc + x + y * m->w));
+            }
+        }
+
+        acc += m->w + m->h;
+    }
+}
 
 int main (int argc, char *argv[]) {
     // Start networking thread
@@ -77,7 +119,6 @@ int main (int argc, char *argv[]) {
     Matrix* matrices[] = {&eye_l, &eye_r, &nose_l, &nose_r,
                           &mouth_l_b, &mouth_l_f, &mouth_r_b, &mouth_r_f};
 
-    eye_l.drawPixel(15, 7, true);
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(window_w, window_h), "My window", sf::Style::Titlebar | sf::Style::Close);
@@ -90,14 +131,21 @@ int main (int argc, char *argv[]) {
         while (window.pollEvent(event))
         {
             // "close requested" event: we close the window
-            if (event.type == sf::Event::Closed)
+            if (event.type == sf::Event::Closed ||
+                event.type == sf::Event::KeyPressed){
+                shouldStop = true;
+                std::cout << "closing" << std::endl;
                 window.close();
+                net.join();
+            }
         }
 
         // clear the window with black color
         window.clear(sf::Color::Black);
 
         // draw everything here...
+        drawFb(matrices, 8);
+
         for(auto matrix: matrices) {
             matrix->render(window);
         }

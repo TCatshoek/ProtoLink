@@ -27,11 +27,17 @@
 template <class Connection>
 class ProtoLink {
 public:
-    enum State {
+    enum class State {
         NO_CONN,
         INIT,
         RECV_FB,
         ERR
+    };
+
+    enum class MsgType {
+        RECV_FB,
+        AREYOUTHERE,
+        YESIMHERE,
     };
 
 private:
@@ -40,7 +46,7 @@ private:
     uint fb_size;
 
     // Initial state
-    State state = NO_CONN;
+    State state = State::NO_CONN;
 
 public:
     ProtoLink(uint8_t* fbp, uint fbs){
@@ -50,85 +56,70 @@ public:
 
     State init(Connection* c) {
         con = c;
-        state = INIT;
+        state = State::INIT;
         return state;
     }
 
     State run() {
         switch(state) {
-            case NO_CONN: break;
-            case INIT:    run_INIT();     break;
-            case RECV_FB: run_RECV_FB();  break;
+            case State::NO_CONN: break;
+            case State::INIT:    run_INIT();     break;
+            case State::RECV_FB: run_RECV_FB();  break;
         }
         return state;
     }
 
     String stateToString() {
         switch (state) {
-            to_str(NO_CONN);
-            to_str(INIT);
-            to_str(RECV_FB);
-            to_str(ERR);
+            to_str(State::NO_CONN);
+            to_str(State::INIT);
+            to_str(State::RECV_FB);
+            to_str(State::ERR);
         }
-        return "Unknown";
+        return "Unknown"; // Unreachable, yet clang complains
     }
 
 private:
     // State methods
     void run_INIT() {
-        while (con->connected()) {
-            if (con->available()) {
-                int in = con->read();
+        auto in = (MsgType)con->read();
 
-                switch(in) {
-                    case RECV_FB: state = RECV_FB; break;
-                    default: state = ERR; break;
-                };
+        switch(in) {
+            case MsgType::RECV_FB:
+                state = State::RECV_FB;
+                break;
 
-                return;
-            }
-            YIELD
-        }
+            case MsgType::AREYOUTHERE:
+                con->write((char)MsgType::YESIMHERE);
+                break;
+
+            default:
+                state = State::ERR;
+        };
     }
 
     void run_RECV_FB() {
 
         // First LEN_N_BYTES bytes are body length in bytes
         uint len = 0;
-        while (!len && con->connected()) {
-            if (con->available() >= LEN_N_BYTES) {
 
-                uint8_t lenbuf[LEN_N_BYTES];
-                con->readBytes(lenbuf, LEN_N_BYTES);
+        uint8_t lenbuf[LEN_N_BYTES];
+        uint b_read = con->readBytes(lenbuf, LEN_N_BYTES);
 
-                for (int i = 0; i < LEN_N_BYTES; i++) {
-                    len |= (lenbuf[LEN_N_BYTES - 1 - i] << i * 8);
-                }
-            }
-            YIELD
+        if (b_read == 0) {
+            return;
+        }
+
+        // Assemble bytes into int
+        for (int i = 0; i < LEN_N_BYTES; i++) {
+            len |= (lenbuf[LEN_N_BYTES - 1 - i] << i * 8);
         }
 
         // Copy the rest of the message into the framebuffer
-        while (con->connected()) {
+        con->readBytes(fb, fb_size);
 
-            // TODO:: Should check if remote is still open,
-            // Might get stuck otherwise
-
-            int available = con->available();
-
-            if (con->available() >= len) {
-
-                // No buffer overflow pls
-                int copy_len = min(fb_size, len);
-
-                con->readBytes(fb, copy_len);
-
-                // Go back to initial state to wait for next command
-                state = INIT;
-                return;
-            }
-            YIELD
-        }
+        // Go back to initial state to wait for next command
+        state = State::INIT;
     }
 };
 

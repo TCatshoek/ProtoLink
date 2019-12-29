@@ -17,9 +17,6 @@ private:
     const float x;
     const float y;
 
-    const int w;
-    const int h;
-
     bool mirror;
 
     void drawCircle(sf::RenderWindow& window, int i, int p) {
@@ -36,6 +33,9 @@ private:
     }
 
 public:
+    const int w;
+    const int h;
+
     Matrix(int w, int h, float pos_x, float pos_y, bool mirrored)
     : x(pos_x), y(pos_y), w(w), h(h){
         mirror = mirrored;
@@ -64,9 +64,7 @@ public:
     }
 
     void drawPixel(int x, int y, bool state) {
-        std::cout << x << ", " << y << std::endl;
         fb.at(x).at(y) = state;
-        std::cout << x << ", " << y << std::endl;
     }
 };
 
