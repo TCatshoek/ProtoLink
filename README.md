@@ -2,7 +2,7 @@
 
 #### build instructions: 
 
-Dependencies: SFML
+Dependencies: SFML, Boost
 
 ```
 git clone git@github.com:TCatshoek/ProtoLink.git
