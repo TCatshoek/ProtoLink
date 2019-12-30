@@ -5,8 +5,21 @@
 #ifndef PROTOLINK_TCPWRAPPER_H
 #define PROTOLINK_TCPWRAPPER_H
 
+#include <boost/asio.hpp>
+using boost::asio::ip::tcp;
 
-class TcpWrapper {
+class TCPWrapper {
+private:
+    tcp::socket &socket;
+
+public:
+    TCPWrapper(tcp::socket &socket);
+
+    int read();
+
+    size_t readBytes(void* buf, uint len);
+
+    int write(char);
 
 };
 

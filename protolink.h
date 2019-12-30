@@ -13,7 +13,11 @@
     #define YIELD
     #define String std::string
     #define to_str(p) case(p): return std::string(#p);
-    #define min std::min
+
+    int min(int a, int b) {
+        return a < b ? a : b;
+    }
+
 #endif
 #ifdef ESP8266
     #define YIELD yield();
@@ -116,7 +120,7 @@ private:
         }
 
         // Copy the rest of the message into the framebuffer
-        con->readBytes(fb, fb_size);
+        con->readBytes(fb, min(fb_size, len));
 
         // Go back to initial state to wait for next command
         state = State::INIT;

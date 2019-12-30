@@ -4,17 +4,15 @@
 #include <SFML/Graphics.hpp>
 #include "matrix.h"
 #include <thread>
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <libnet.h>
-
-#include "TCPSocket.h"
-#include "TCPServer.h"
 #include "protolink.h"
+#include "tcpwrapper.h"
+
+#include <boost/asio.hpp>
+using boost::asio::ip::tcp;
 
 #define buflen 1024
+
+#define PORT 8080
 
 namespace {
     uint window_w = 1000;
@@ -23,59 +21,55 @@ namespace {
     uint8_t buf[buflen];
 
     bool shouldStop = false;
-
-    TCPServer* server_p;
-    TCPSocket* socket_p;
 }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
 void handleNetwork(uint16_t port) {
     // Setup protolink
-    ProtoLink<TCPSocket> protolink(buf, buflen);
+    ProtoLink<TCPWrapper> protolink(buf, buflen);
+    try {
+        // Create boost IO service
+        boost::asio::io_service io_service;
 
-    // Setup neworking
-    TCPServer server(8080);
-    server_p = &server;
+        // Start listening
+        tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), PORT));
 
-    while (!shouldStop) {
-        // Wait for connection
-        TCPSocket socket = server.accept();
-        socket_p = &socket;
-        std::cout << "Client connected from " << socket.getAddress() << ":" << socket.getPort() << std::endl;
+        while (!shouldStop) {
+            try{
+                // Wait for client to connect
+                tcp::socket socket(io_service);
+                acceptor.accept(socket);
 
-        // Todo: figure out timeout stuff
-        //socket.setTimeout(10, 0);
-        //socket.setBlocking(false);
+                // Wrap the boost socket so protolink knows how to talk to it
+                TCPWrapper sock(socket);
 
-        while (socket.connected() && !shouldStop) {
-            // Keep track of protolink state
-            ProtoLink<TCPSocket>::State state;
-            state = protolink.init(&socket);
-
-            std::cout << "Protolink: " << protolink.stateToString() << std::endl;
-
-            // Step protolink while we can
-            while (socket.connected()
-                    && state != ProtoLink<TCPSocket>::State::ERR
-                    && !shouldStop) {
-
-                state = protolink.run();
+                // Keep track of protolink state
+                ProtoLink<TCPWrapper>::State state;
+                state = protolink.init(&sock);
                 std::cout << "Protolink: " << protolink.stateToString() << std::endl;
 
-                if (socket.connected())
-                    socket.write((char)state);
+                while (state != ProtoLink<TCPWrapper>::State::ERR) {
+                    protolink.run();
+                    std::cout << "Protolink: " << protolink.stateToString() << std::endl;
+
+                    sock.write((char)state);
+                }
+            }
+            catch (boost::system::system_error& e) {
+                if (e.code() == boost::asio::error::connection_reset) {
+                    std::cerr << "Client disconnected: " << e.what() << std::endl;
+                } else {
+                    throw e;
+                }
+
             }
         }
-
-        socket.close();
-
-        std::cout << "Client disconnected" << std::endl;
+    }
+    catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        exit(-1);
     }
 
-    server.close();
 }
-#pragma clang diagnostic pop
 
 bool getbit(const uint8_t* buf, int pos) {
     int byteidx = pos / (sizeof(uint8_t) * 8);
@@ -126,7 +120,7 @@ int main (int argc, char *argv[]) {
 
 
     // create the window
-    sf::RenderWindow window(sf::VideoMode(window_w, window_h), "My window", sf::Style::Titlebar | sf::Style::Close);
+    sf::RenderWindow window(sf::VideoMode(window_w, window_h), "Beeper simulator v0.0.1", sf::Style::Titlebar | sf::Style::Close);
 
     window.setFramerateLimit(60);
     // run the program as long as the window is open
@@ -144,6 +138,7 @@ int main (int argc, char *argv[]) {
                 window.close();
                 // Doesn't really work yet
                 shouldStop = true;
+                net.join();
             }
         }
 
