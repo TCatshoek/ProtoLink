@@ -138,7 +138,7 @@ int main (int argc, char *argv[]) {
                 window.close();
                 // Doesn't really work yet
                 shouldStop = true;
-                net.join();
+                exit(0);
             }
         }
 
