@@ -57,7 +57,10 @@ void handleNetwork(uint16_t port) {
             catch (boost::system::system_error& e) {
                 if (e.code() == boost::asio::error::connection_reset) {
                     std::cerr << "Client disconnected: " << e.what() << std::endl;
-                } else {
+                } else if (e.code() == boost::asio::error::eof){
+                    std::cerr << "Client disconnected: " << e.what() << std::endl;
+                }
+                else {
                     throw e;
                 }
 
@@ -65,7 +68,7 @@ void handleNetwork(uint16_t port) {
         }
     }
     catch (std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        std::cerr << "Stopping - " << e.what() << std::endl;
         exit(-1);
     }
 
