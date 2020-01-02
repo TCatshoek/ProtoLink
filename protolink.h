@@ -32,7 +32,6 @@
 #endif
 
 #define LEN_N_BYTES 4
-#define MSGBUF_SIZE 1024
 
 
 template <class Connection>
@@ -59,9 +58,6 @@ private:
     // Keep track of how many bytes to recieve next
     uint to_recv = 0;
 
-    // Buffer for receiving messages in
-    uint8_t msgbuf[MSGBUF_SIZE];
-
     // Connection wrapper adapted from
     // https://github.com/eric-wieser/nanopb-arduino/blob/master/src/pb_arduino.cpp
     static bool pb_conn_read(pb_istream_t *stream, pb_byte_t *buf, size_t count) {
@@ -78,7 +74,6 @@ private:
     // framebuffer without first making a copy
     static bool write_fb(pb_istream_t *stream, const pb_field_t *field, void **arg) {
         auto* p = (ProtoLink<Connection>*) arg[0];
-
         if (stream->bytes_left > p->fb_size) {
             p->state = State::ERR;
             p->error_msg = "New framebuffer data exceeds framebuffer size";
@@ -89,7 +84,7 @@ private:
     }
 
     // Nanopb decoding for oneof messages
-    // https://github.com/nanopb/nanopb/blob/master/tests/oneof/decode_oneof.c
+    // https://github.com/nanopb/nanopb/blob/master/tests/oneof_callback/decode_oneof.c
     static bool command_decode_callback(pb_istream_t *stream, const pb_field_t *field, void **arg)
     {
         auto* p = (ProtoLink<Connection>*) arg[0];
@@ -100,7 +95,7 @@ private:
             case Command_updatefb_tag:
                 auto submsg = (UpdateFB*)field->pData;
                 submsg->fb.funcs.decode = write_fb;
-                submsg->fb.arg = arg;
+                submsg->fb.arg = arg[0];
         };
 
         return true;
@@ -168,7 +163,7 @@ private:
         Command msg = (Command)Command_init_zero;
 
         msg.cb_c.funcs.decode = command_decode_callback;
-        msg.cb_c.arg = {this};
+        msg.cb_c.arg = this;
 
         // Attempt decode
         if (!pb_decode(&istream, Command_fields, &msg))
