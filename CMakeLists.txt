@@ -20,7 +20,6 @@ add_executable(protolink
         protolink.h
         matrix.h matrix.cpp
         tcpwrapper.cpp tcpwrapper.h
-        nanopb_decoders.h
         ${PROTO_SRCS} ${PROTO_HDRS} )
 
 find_package(SFML 2.5 COMPONENTS audio graphics window system REQUIRED)

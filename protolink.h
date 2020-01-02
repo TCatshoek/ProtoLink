@@ -5,7 +5,6 @@
 #ifndef PROTOLINK_PROTOLINK_H
 #define PROTOLINK_PROTOLINK_H
 
-#include "nanopb_decoders.h"
 #include <pb_decode.h>
 #include "protolink.pb.h"
 
@@ -75,6 +74,38 @@ private:
         return {pb_conn_read, c, count};
     }
 
+    // Nanopb decoding callback to write the incoming
+    // framebuffer without first making a copy
+    static bool write_fb(pb_istream_t *stream, const pb_field_t *field, void **arg) {
+        auto* p = (ProtoLink<Connection>*) arg[0];
+
+        if (stream->bytes_left > p->fb_size) {
+            p->state = State::ERR;
+            p->error_msg = "New framebuffer data exceeds framebuffer size";
+            return false;
+        }
+
+        return pb_read(stream, p->fb, stream->bytes_left);
+    }
+
+    // Nanopb decoding for oneof messages
+    // https://github.com/nanopb/nanopb/blob/master/tests/oneof/decode_oneof.c
+    static bool command_decode_callback(pb_istream_t *stream, const pb_field_t *field, void **arg)
+    {
+        auto* p = (ProtoLink<Connection>*) arg[0];
+
+        auto msg = (Command*)field->message;
+
+        switch (field->tag) {
+            case Command_updatefb_tag:
+                auto submsg = (UpdateFB*)field->pData;
+                submsg->fb.funcs.decode = write_fb;
+                submsg->fb.arg = arg;
+        };
+
+        return true;
+    }
+
 public:
     ProtoLink(uint8_t* fbp, uint fbs){
         fb = fbp;
@@ -136,7 +167,7 @@ private:
 
         Command msg = (Command)Command_init_zero;
 
-        msg.cb_c.funcs.decode = command_decode_callback<Connection>;
+        msg.cb_c.funcs.decode = command_decode_callback;
         msg.cb_c.arg = {this};
 
         // Attempt decode
