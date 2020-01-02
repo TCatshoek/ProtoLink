@@ -3,26 +3,25 @@ project(protolink)
 
 set(CMAKE_C_STANDARD 11)
 
-set(NANOPB
-        protobuf/nanopb/pb.h
-        protobuf/nanopb/pb_common.h
-        protobuf/nanopb/pb_common.c
-        protobuf/nanopb/pb_encode.h
-        protobuf/nanopb/pb_encode.c
-        protobuf/nanopb/pb_decode.h
-        protobuf/nanopb/pb_decode.c
-        protobuf/nanopb/protolink.pb.h
-        protobuf/nanopb/protolink.pb.c
-        )
-include_directories(protobuf/nanopb)
+# Point this to correct nanopb folder
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/nanopb/extra)
+
+find_package(Nanopb REQUIRED)
+include_directories(${NANOPB_INCLUDE_DIRS})
+
+nanopb_generate_cpp(PROTO_SRCS PROTO_HDRS protobuf/ProtoLink_protobuf/protolink.proto)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
+set_source_files_properties(${PROTO_SRCS} ${PROTO_HDRS}
+        PROPERTIES GENERATED TRUE)
 
 add_executable(protolink
         main.cpp
         protolink.h
         matrix.h matrix.cpp
         tcpwrapper.cpp tcpwrapper.h
-        ${NANOPB}
-        )
+        nanopb_decoders.h
+        ${PROTO_SRCS} ${PROTO_HDRS} )
 
 find_package(SFML 2.5 COMPONENTS audio graphics window system REQUIRED)
 
